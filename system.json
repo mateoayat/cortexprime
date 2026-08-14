@@ -16,7 +16,7 @@
       "character": {}
     }
   },
-  "download": "https://github.com/Secular12/cortexprime/archive/refs/tags/v0.3.0.zip",
+  "download": "https://github.com/mateoayat/cortexprime/releases/download/v0.4.0/cortexprime.zip",
   "esmodules": ["cortexprime.js"],
   "id": "cortexprime",
   "grid": {
@@ -30,11 +30,11 @@
       "path": "lang/en.json"
     }
   ],
-  "manifest": "https://raw.githubusercontent.com/Secular12/cortexprime/master/system.json",
+  "manifest": "https://github.com/mateoayat/cortexprime/releases/latest/download/system.json",
   "packs": [],
   "scripts": [],
   "styles": ["css/cortexprime.css"],
   "title": "Cortex Prime",
-  "url": "https://github.com/Secular12/cortexprime",
-  "version": "0.3.0"
+  "url": "https://github.com/mateoayat/cortexprime",
+  "version": "0.4.0"
 }
