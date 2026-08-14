@@ -1,46 +1,57 @@
-import defaultActorTypes from "../actor/defaultActorTypes.js"
-import { localizer, setCssVars } from "../scripts/foundryHelpers.js"
+import defaultActorTypes from '../actor/defaultActorTypes.js'
+import { localizer, setCssVars } from '../scripts/foundryHelpers.js'
+import { bindAll } from '../scripts/domHelpers.js'
 
-export default class ImportExportSettings extends FormApplication {
-  constructor() {
-    super()
-  }
+const { ApplicationV2, DialogV2, HandlebarsApplicationMixin } = foundry.applications.api
 
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: 'import-export-settings',
-      template: 'systems/cortexprime/templates/import-export-settings.html',
-      title: localizer('ImportExportSettings'),
-      classes: ['cortexprime', 'import-export-settings'],
+export default class ImportExportSettings extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: 'import-export-settings',
+    classes: ['cortexprime', 'import-export-settings'],
+    tag: 'form',
+    window: {
+      title: 'ImportExportSettings',
+      resizable: true
+    },
+    position: {
       width: 'auto',
       height: 'auto',
       top: 200,
-      left: 400,
-      resizable: true,
-      closeOnSubmit: false,
-      submitOnClose: true,
-      submitOnChange: true
-    })
+      left: 400
+    },
+    form: {
+      handler: ImportExportSettings.onSubmit,
+      submitOnChange: true,
+      closeOnSubmit: false
+    }
   }
 
-  getData() {
+  static PARTS = {
+    body: {
+      template: 'systems/cortexprime/templates/import-export-settings.html'
+    }
+  }
+
+  async _prepareContext (options) {
     return game.settings.get('cortexprime', 'importedSettings')
   }
 
-  async _updateObject(event, formData) {
+  static async onSubmit (event, form, formData) {}
+
+  _onRender (context, options) {
+    super._onRender(context, options)
+
+    const html = this.element
+
+    bindAll(html, '.export-settings', 'click', this._exportSettings.bind(this))
+    bindAll(html, '.import-settings', 'change', this._importSettings.bind(this))
+    bindAll(html, '.reset-settings', 'click', this._resetSettings.bind(this))
   }
 
-  activateListeners(html) {
-    super.activateListeners(html)
-    html.find('.export-settings').click(this._exportSettings.bind(this))
-    html.find('.import-settings').change(this._importSettings.bind(this))
-    html.find('.reset-settings').click(this._resetSettings.bind(this))
-  }
-
-  async _exportSettings(event) {
+  async _exportSettings (event) {
     event.preventDefault()
 
-    const { current, custom } = await game.settings.get('cortexprime', 'themes')
+    const { current, custom } = game.settings.get('cortexprime', 'themes')
 
     const settings = {
       actorTypes: game.settings.get('cortexprime', 'actorTypes'),
@@ -48,93 +59,82 @@ export default class ImportExportSettings extends FormApplication {
       theme: { current, custom }
     }
 
-    await saveDataToFile(JSON.stringify(settings), 'json', 'my-cortex-prime-settings.json')
+    foundry.utils.saveDataToFile(JSON.stringify(settings), 'json', 'my-cortex-prime-settings.json')
   }
 
-  async _importSettings(event) {
+  async _importSettings (event) {
     event.preventDefault()
-    const file = $(event.currentTarget).prop('files')[0]
+    const [file] = event.currentTarget.files ?? []
 
-    if (file) {
-      const fileReader = new FileReader()
+    if (!file) return
 
-      fileReader.onload = async () => {
-        let data
-        let warning
+    let data
 
-        try {
-          data = JSON.parse(fileReader.result)
-        } catch (error) {
-          console.error(error)
-          ui.notifications.error(localizer('CantReadImportFile'))
-          return
-        }
-
-        if (!data?.cortexPrimeVersion && !data?.actorTypes) {
-          ui.notifications.error(localizer('CantReadImportFile'))
-          return
-        }
-
-        if (game.system.version !== data?.cortexPrimeVersion) {
-          warning = localizer('ImportVersionWarning')
-        }
-
-        let confirmed
-
-        await Dialog.confirm({
-          title: localizer('AreYouSure'),
-          content: `<div>${warning ? '<p class="my-2 pa-2 ba-2-primary">' + warning + '</p>' : ''}<p class="my-2">${localizer('ConfirmImportMessage')}</p></div>`,
-          yes: () => { confirmed = true },
-          no: () => { confirmed = false },
-          defaultYes: false
-        })
-
-        if (confirmed) {
-          await game.settings.set('cortexprime', 'importedSettings', { currentSetting: file.name })
-          await game.settings.set('cortexprime', 'actorTypes', data.actorTypes)
-
-          const themeSettings = await game.settings.get('cortexprime', 'themes')
-
-          const { current, custom } = data.theme ?? {}
-
-          themeSettings.current = current ?? 'Default'
-          themeSettings.custom = custom ?? themeSettings.custom
-
-          await game.settings.set('cortexprime', 'themes', themeSettings)
-
-          const theme = themeSettings.current === 'custom' ? themeSettings.custom : themeSettings.list[themeSettings.current]
-
-          setCssVars(theme)
-
-          ui.notifications.info(localizer('ImportSuccessMessage'))
-
-          this.render(true)
-        }
-      }
-
-      fileReader.readAsText(file)
+    try {
+      data = JSON.parse(await file.text())
+    } catch (error) {
+      console.error(error)
+      ui.notifications.error(localizer('CantReadImportFile'))
+      return
     }
+
+    if (!data?.cortexPrimeVersion && !data?.actorTypes) {
+      ui.notifications.error(localizer('CantReadImportFile'))
+      return
+    }
+
+    const warning = game.system.version !== data?.cortexPrimeVersion
+      ? localizer('ImportVersionWarning')
+      : null
+
+    const confirmed = await DialogV2.confirm({
+      window: { title: localizer('AreYouSure') },
+      content: `<div>${warning ? '<p class="my-2 pa-2 ba-2-primary">' + warning + '</p>' : ''}<p class="my-2">${localizer('ConfirmImportMessage')}</p></div>`,
+      modal: true,
+      yes: { default: false },
+      no: { default: true }
+    })
+
+    if (!confirmed) return
+
+    await game.settings.set('cortexprime', 'importedSettings', { currentSetting: file.name })
+    await game.settings.set('cortexprime', 'actorTypes', data.actorTypes)
+
+    const themeSettings = game.settings.get('cortexprime', 'themes')
+
+    const { current, custom } = data.theme ?? {}
+
+    themeSettings.current = current ?? 'Default'
+    themeSettings.custom = custom ?? themeSettings.custom
+
+    await game.settings.set('cortexprime', 'themes', themeSettings)
+
+    const theme = themeSettings.current === 'custom' ? themeSettings.custom : themeSettings.list[themeSettings.current]
+
+    setCssVars(theme)
+
+    ui.notifications.info(localizer('ImportSuccessMessage'))
+
+    await this.render()
   }
 
   async _resetSettings (event) {
     event.preventDefault()
 
-    let confirmed
-
-    await Dialog.confirm({
-      title: localizer('AreYouSure'),
-      content: localizer('ConfirmResetSettingsMessage'),
-      yes: () => { confirmed = true },
-      no: () => { confirmed = false },
-      defaultYes: false
+    const confirmed = await DialogV2.confirm({
+      window: { title: localizer('AreYouSure') },
+      content: `<p>${localizer('ConfirmResetSettingsMessage')}</p>`,
+      modal: true,
+      yes: { default: false },
+      no: { default: true }
     })
 
-    if (confirmed) {
-      await game.settings.set('cortexprime', 'importedSettings', { currentSetting: localizer('Default') })
-      await game.settings.set('cortexprime', 'actorTypes', defaultActorTypes)
-      ui.notifications.info(localizer('ResetSuccessMessage'))
+    if (!confirmed) return
 
-      this.render(true)
-    }
+    await game.settings.set('cortexprime', 'importedSettings', { currentSetting: localizer('Default') })
+    await game.settings.set('cortexprime', 'actorTypes', defaultActorTypes)
+    ui.notifications.info(localizer('ResetSuccessMessage'))
+
+    await this.render()
   }
 }

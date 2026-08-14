@@ -1,4 +1,5 @@
 import { CortexPrimeActor } from './module/entities/CortexPrimeActor.js'
+import { CharacterData } from './module/data/CharacterData.js'
 import PlotPoint from './module/PlotPoint.js'
 import { preloadHandlebarsTemplates } from './module/handlebars/preloadTemplates.js'
 import { registerHandlebarHelpers } from './module/handlebars/helpers.js'
@@ -14,14 +15,17 @@ Hooks.once('init', () => {
   }
 
   CONFIG.Actor.documentClass = CortexPrimeActor
+  CONFIG.Actor.dataModels.character = CharacterData
   CONFIG.Dice.terms['p'] = PlotPoint
 
   registerHandlebarHelpers()
   preloadHandlebarsTemplates()
   registerSettings()
 
-  foundry.documents.collections.Actors.unregisterSheet("core", foundry.appv1.sheets.ActorSheet)
-  foundry.documents.collections.Actors.registerSheet("cortexprime", CortexPrimeActorSheet, { makeDefault: true })
+  const { DocumentSheetConfig } = foundry.applications.apps
+
+  DocumentSheetConfig.unregisterSheet(foundry.documents.Actor, 'core', foundry.applications.sheets.ActorSheetV2)
+  DocumentSheetConfig.registerSheet(foundry.documents.Actor, 'cortexprime', CortexPrimeActorSheet, { makeDefault: true })
 
   cortexPrimeHooks()
 })

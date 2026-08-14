@@ -1,39 +1,56 @@
-import { localizer, setCssVars } from '../scripts/foundryHelpers.js'
+import { setCssVars } from '../scripts/foundryHelpers.js'
+import { bindAll } from '../scripts/domHelpers.js'
 import defaultThemes from '../theme/defaultThemes.js'
 
-export default class ThemeSettings extends FormApplication {
-  constructor() {
-    super()
-  }
+const { ApplicationV2, HandlebarsApplicationMixin } = foundry.applications.api
 
-  static get defaultOptions () {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      id: 'theme-settings',
-      template: 'systems/cortexprime/templates/theme/settings.html',
-      title: localizer('ThemeSettings'),
-      classes: ['cortexprime', 'theme-settings'],
+const applyCurrentTheme = () => {
+  const themes = game.settings.get('cortexprime', 'themes')
+  const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+
+  setCssVars(theme)
+}
+
+export default class ThemeSettings extends HandlebarsApplicationMixin(ApplicationV2) {
+  static DEFAULT_OPTIONS = {
+    id: 'theme-settings',
+    classes: ['cortexprime', 'theme-settings'],
+    tag: 'form',
+    window: {
+      title: 'ThemeSettings',
+      resizable: true
+    },
+    position: {
       width: 960,
       height: 900,
       top: 200,
-      left: 400,
-      resizable: true,
-      closeOnSubmit: false,
-      submitOnClose: true,
-      submitOnChange: true
-    })
+      left: 400
+    },
+    form: {
+      handler: ThemeSettings.onSubmit,
+      submitOnChange: true,
+      closeOnSubmit: false
+    }
   }
 
-  getData() {
-    const themes = game.settings.get('cortexprime', 'themes')
+  static PARTS = {
+    body: {
+      template: 'systems/cortexprime/templates/theme/settings.html'
+    }
+  }
 
+  async _prepareContext (options) {
     return {
-      themes,
+      themes: game.settings.get('cortexprime', 'themes'),
       defaultVersion: defaultThemes.version
     }
   }
 
-  async _updateObject(event, formData) {
-    const expandedFormData = foundry.utils.expandObject(formData)
+  static async onSubmit (event, form, formData) {
+    const expandedFormData = foundry.utils.expandObject(formData.object)
+
+    if (!expandedFormData.themes) return
+
     const currentThemes = game.settings.get('cortexprime', 'themes') ?? {}
 
     expandedFormData.themes.currentSettings = currentThemes.current !== expandedFormData.themes.current
@@ -44,21 +61,21 @@ export default class ThemeSettings extends FormApplication {
 
     await game.settings.set('cortexprime', 'themes', foundry.utils.mergeObject(currentThemes, expandedFormData.themes))
 
-    const themes = game.settings.get('cortexprime', 'themes')
-    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+    applyCurrentTheme()
 
-    setCssVars(theme)
-
-    this.render(true)
+    await this.render()
   }
 
-  activateListeners(html) {
-    super.activateListeners(html)
-    html.find('.image-picker').click(this._changeImage.bind(this))
-    html.find('.image-remove').click(this._removeImage.bind(this))
-    html.find('.refresh-preset').click(this._refreshPreset.bind(this))
-    html.find('.save-as-custom-preset').click(this._saveAsCustomPreset.bind(this))
-    html.find('.update-presets').click(this._updatePresets.bind(this))
+  _onRender (context, options) {
+    super._onRender(context, options)
+
+    const html = this.element
+
+    bindAll(html, '.image-picker', 'click', this._changeImage.bind(this))
+    bindAll(html, '.image-remove', 'click', this._removeImage.bind(this))
+    bindAll(html, '.refresh-preset', 'click', this._refreshPreset.bind(this))
+    bindAll(html, '.save-as-custom-preset', 'click', this._saveAsCustomPreset.bind(this))
+    bindAll(html, '.update-presets', 'click', this._updatePresets.bind(this))
   }
 
   async _changeImage (event) {
@@ -66,21 +83,20 @@ export default class ThemeSettings extends FormApplication {
     const { targetSetting } = event.currentTarget.dataset
     const source = game.settings.get('cortexprime', 'themes')
     const currentImage = source?.currentSettings?.[targetSetting] || null
-    const _this = this
 
-    const imagePicker = await new FilePicker({
+    const imagePicker = new foundry.applications.apps.FilePicker.implementation({
       type: 'image',
       current: currentImage,
-      async callback (newImage) {
+      callback: async newImage => {
         source.currentSettings[targetSetting] = newImage
 
         await game.settings.set('cortexprime', 'themes', source)
 
-        _this.render()
+        await this.render()
       }
     })
 
-    await imagePicker.render()
+    await imagePicker.browse()
   }
 
   async _removeImage (event) {
@@ -91,7 +107,7 @@ export default class ThemeSettings extends FormApplication {
 
     await game.settings.set('cortexprime', 'themes', source)
 
-    this.render()
+    await this.render()
   }
 
   async _refreshPreset (event) {
@@ -103,12 +119,9 @@ export default class ThemeSettings extends FormApplication {
 
     await game.settings.set('cortexprime', 'themes', source)
 
-    const themes = game.settings.get('cortexprime', 'themes')
-    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+    applyCurrentTheme()
 
-    setCssVars(theme)
-
-    this.render()
+    await this.render()
   }
 
   async _saveAsCustomPreset (event) {
@@ -119,12 +132,9 @@ export default class ThemeSettings extends FormApplication {
 
     await game.settings.set('cortexprime', 'themes', source)
 
-    const themes = game.settings.get('cortexprime', 'themes')
-    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+    applyCurrentTheme()
 
-    setCssVars(theme)
-
-    this.render()
+    await this.render()
   }
 
   async _updatePresets (event) {
@@ -142,11 +152,8 @@ export default class ThemeSettings extends FormApplication {
 
     await game.settings.set('cortexprime', 'themes', source)
 
-    const themes = game.settings.get('cortexprime', 'themes')
-    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+    applyCurrentTheme()
 
-    setCssVars(theme)
-
-    this.render()
+    await this.render()
   }
 }

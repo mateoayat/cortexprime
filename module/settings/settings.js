@@ -60,7 +60,7 @@ export const registerSettings = () => {
 
   game.settings.register("cortexprime", "WelcomeSeen", {
     name: localizer('WelcomeSeen'),
-    hint: localizer('WelcomSeenHint'),
+    hint: localizer('WelcomeSeenHint'),
     scope: "world",
     config: false,
     type: Boolean,

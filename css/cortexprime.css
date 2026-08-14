@@ -1,20 +1,20 @@
 @import url("https://fonts.googleapis.com/css2?family=Roboto:ital,wght@0,300;0,400;0,700;0,900;1,300;1,400;1,700;1,900&display=swap");
 /* Global styles */
 /* Styles limited to cortexprime sheets */
-.cortexprime .window-app {
+.cortexprime .application {
   font-family: "Roboto", sans-serif;
 }
-.cortexprime .window-app .window-content {
+.cortexprime .application .window-content {
   background: #ffffff;
 }
-.cortexprime.window-app .window-content {
+.cortexprime.application .window-content {
   background: none;
   padding: 0;
 }
-.cortexprime.window-app .window-resizable-handle {
+.cortexprime.application .window-resize-handle {
   z-index: 10;
 }
-.cortexprime .dice-picker.window-app .window-content, .cortexprime .consumable-dice.window-app .window-content {
+.cortexprime .dice-picker.application .window-content, .cortexprime .consumable-dice.application .window-content {
   background: none;
   padding: 0;
 }
@@ -32,7 +32,6 @@
 .cortexprime .truncate {
   width: 21.25rem;
   overflow: hidden;
-  -o-text-overflow: ellipsis;
   text-overflow: ellipsis;
   text-align: center;
   white-space: nowrap;
@@ -1158,10 +1157,12 @@
   -moz-text-align-last: center;
   -webkit-appearance: none;
   -moz-appearance: none;
-  z-index: 1;
 }
 .die-select ::-ms-expand {
   display: none;
+}
+.die-select {
+  z-index: 1;
 }
 .die-select:focus {
   -webkit-box-shadow: none;
@@ -1279,15 +1280,15 @@
   background-color: transparent;
   color: var(--cp-body-font-color, #000000);
 }
-.cortexprime .dialog-buttons .dialog-button.cancel, .cortexprime .dialog-buttons .dialog-button.confirm, .cortexprime .dialog-buttons .dialog-button.done {
+.cortexprime .form-footer button[data-action=cancel], .cortexprime .form-footer button[data-action=no], .cortexprime .form-footer button[data-action=confirm], .cortexprime .form-footer button[data-action=done], .cortexprime .form-footer button[data-action=ok], .cortexprime .form-footer button[data-action=yes] {
   border: 0;
   cursor: pointer;
 }
-.cortexprime .dialog-buttons .dialog-button.confirm, .cortexprime .dialog-buttons .dialog-button.done {
+.cortexprime .form-footer button[data-action=confirm], .cortexprime .form-footer button[data-action=done], .cortexprime .form-footer button[data-action=ok], .cortexprime .form-footer button[data-action=yes] {
   background-color: var(--cp-button-primary-color, #2d5931);
   color: var(--cp-button-primary-font-color, #ffffff);
 }
-.cortexprime .dialog-buttons .dialog-button.cancel {
+.cortexprime .form-footer button[data-action=cancel], .cortexprime .form-footer button[data-action=no] {
   background-color: var(--cp-button-secondary-color, #2d5931);
   color: var(--cp-button-secondary-font-color, #ffffff);
 }
@@ -1584,24 +1585,21 @@
   border-bottom: var(--cp-separator-weight, 2px) var(--cp-separator-style, solid) var(--cp-separator-color, #b30044);
   width: 100%;
 }
-.cortexprime .editor {
+.cortexprime prose-mirror {
   height: 100%;
   width: 100%;
 }
-.cortexprime .editor .editor-content {
+.cortexprime prose-mirror .editor-content {
+  background-color: #ffffff;
   border: var(--cp-input-border-width, 2px) var(--cp-input-border-style, solid) var(--cp-input-border-color, #2d5931);
   padding: 0.5rem;
 }
-.cortexprime .editor .tox-edit-area {
-  background-color: #ffffff;
-  border: var(--cp-input-border-width, 2px) var(--cp-input-border-style, solid) var(--cp-input-border-color, #2d5931);
-}
-.cortexprime.window-app .window-header {
+.cortexprime.application .window-header {
   position: relative;
   z-index: 3;
   background-color: rgba(0, 0, 0, 0.7);
 }
-.cortexprime.dialog .dialog-buttons {
+.cortexprime.dialog .form-footer {
   position: relative;
   z-index: 3;
 }

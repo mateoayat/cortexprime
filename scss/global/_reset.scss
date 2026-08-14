@@ -1,4 +1,4 @@
-.window-app {
+.application {
   font-family: $font-primary;
 
   .window-content {
@@ -6,19 +6,19 @@
   }
 }
 
-&.window-app {
+&.application {
   .window-content {
     background: none;
     padding: 0;
   }
 
-  .window-resizable-handle {
+  .window-resize-handle {
     z-index: 10;
   }
 }
 
 .dice-picker, .consumable-dice {
-  &.window-app {
+  &.application {
     .window-content {
       background: none;
       padding: 0;
