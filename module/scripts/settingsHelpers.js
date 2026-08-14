@@ -1,40 +1,11 @@
 import { getLength, objectMapKeys, objectReduce, objectReindexFilter } from '../../lib/helpers.js'
 import { localizer } from './foundryHelpers.js'
+import { bindAll } from './domHelpers.js'
 
-export const collapseToggle = function (html) {
-  html.find('.collapse-toggle').click(async (event) => {
-    event.preventDefault()
-    const $element = $(event.currentTarget)
-    const $collapseValue = $element
-      .next('.collapse-value')
+const { DialogV2 } = foundry.applications.api
 
-    $collapseValue.prop('checked', !($collapseValue.is(':checked')))
-
-    await this._onSubmit(event)
-    this.render(true)
-  })
-}
-
-export const displayToggle = html => {
-  html.find('input.display-toggle').change((event) => {
-    event.preventDefault()
-    const $target = $(event.currentTarget)
-    const scope = $target.data('scope')
-    const selector = $target.data('selector')
-
-    if (scope) {
-      $(event.currentTarget)
-        .closest(scope)
-        .find(selector)
-        .toggle()
-    } else {
-      html.find(selector).toggle()
-    }
-  })
-}
-
-export const removeItem = async function (html) {
-  html.find('.remove-item').click(async event => {
+export const removeItem = function (html) {
+  bindAll(html, '.remove-item', 'click', async event => {
     event.preventDefault()
     const {
       group,
@@ -44,55 +15,52 @@ export const removeItem = async function (html) {
       stayOnPage
     } = event.currentTarget.dataset
 
-    let confirmed
-
-    await Dialog.confirm({
-      title: localizer('AreYouSure'),
-      content: `${localizer('Remove')} ${itemName}?`,
-      yes: () => { confirmed = true },
-      no: () => { confirmed = false },
-      defaultYes: false
+    const confirmed = await DialogV2.confirm({
+      window: { title: localizer('AreYouSure') },
+      content: `<p>${localizer('Remove')} ${foundry.utils.escapeHTML(itemName ?? '')}?</p>`,
+      modal: true,
+      yes: { default: false },
+      no: { default: true }
     })
 
-    if (confirmed) {
-      if (setting) {
-        let settings = game.settings.get('cortexprime', setting)
+    if (!confirmed || !setting) return
 
-        const currentGroupSettings = group ? await foundry.utils.getProperty(settings, group) : settings
-        const groupSettingValue = objectReindexFilter(currentGroupSettings, (_, key) => +key !== +itemKey)
+    let settings = game.settings.get('cortexprime', setting)
 
-        if (group) {
-          foundry.utils.setProperty(settings, group, groupSettingValue)
-        } else {
-          settings = groupSettingValue
-        }
-        await game.settings.set('cortexprime', setting, settings)
+    const currentGroupSettings = group ? foundry.utils.getProperty(settings, group) : settings
+    const groupSettingValue = objectReindexFilter(currentGroupSettings, (_, key) => +key !== +itemKey)
 
-        if (setting === 'actorTypes' && !stayOnPage) {
-          const currentBreadcrumbs = game.settings.get('cortexprime', 'actorBreadcrumbs')
-
-          const breadcrumbsValue = objectReduce(currentBreadcrumbs, (acc, value, key, length) => {
-            if (+key === length - 1) return acc
-            return {
-              ...acc,
-              [key]: {
-                ...value,
-                active: +key === (length - 2)
-              }
-            }
-          }, {})
-
-          await game.settings.set('cortexprime', 'actorBreadcrumbs', breadcrumbsValue)
-        }
-
-        this.render(true)
-      }
+    if (group) {
+      foundry.utils.setProperty(settings, group, groupSettingValue)
+    } else {
+      settings = groupSettingValue
     }
+
+    await game.settings.set('cortexprime', setting, settings)
+
+    if (setting === 'actorTypes' && !stayOnPage) {
+      const currentBreadcrumbs = game.settings.get('cortexprime', 'actorBreadcrumbs')
+
+      const breadcrumbsValue = objectReduce(currentBreadcrumbs, (acc, value, key, length) => {
+        if (+key === length - 1) return acc
+        return {
+          ...acc,
+          [key]: {
+            ...value,
+            active: +key === (length - 2)
+          }
+        }
+      }, {})
+
+      await game.settings.set('cortexprime', 'actorBreadcrumbs', breadcrumbsValue)
+    }
+
+    await this.render()
   })
 }
 
-export const reorderItem = async function (html) {
-  html.find('.reorder').click(async event => {
+export const reorderItem = function (html) {
+  bindAll(html, '.reorder', 'click', async event => {
     event.preventDefault()
     const {
       currentIndex,
@@ -130,6 +98,6 @@ export const reorderItem = async function (html) {
     }
 
     await game.settings.set('cortexprime', setting, settings)
-    this.render(true)
+    await this.render()
   })
 }

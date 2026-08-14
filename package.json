@@ -1,7 +1,10 @@
 {
   "name": "cortexprime",
-  "version": "0.2.16",
+  "version": "0.3.0",
   "description": "CSS compiler for the Cortex Prime system",
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "gulp",
     "compile": "gulp css",
@@ -14,11 +17,10 @@
   "author": "Mark Dekin",
   "license": "MIT",
   "private": true,
-  "dependencies": {
-    "gulp": "^4.0.2",
-    "gulp-autoprefixer": "^8.0.0",
-    "gulp-sass": "^5.0.0",
-    "gulp-sourcemaps": "^3.0.0",
-    "sass": "^1.45.1"
+  "devDependencies": {
+    "gulp": "^5.0.1",
+    "gulp-autoprefixer": "^10.0.0",
+    "gulp-sass": "^6.0.1",
+    "sass": "^1.102.0"
   }
 }

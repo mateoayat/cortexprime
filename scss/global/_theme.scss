@@ -126,19 +126,30 @@
     color: var(--cp-body-font-color, #000000);
   }
 
-  .dialog-buttons {
-    .dialog-button {
-      &.cancel, &.confirm, &.done {
+  // DialogV2 renders its buttons into a .form-footer and identifies them by data-action
+  // rather than the .dialog-button/.confirm class names Dialog v1 used.
+  .form-footer {
+    button {
+      &[data-action='cancel'],
+      &[data-action='no'],
+      &[data-action='confirm'],
+      &[data-action='done'],
+      &[data-action='ok'],
+      &[data-action='yes'] {
         border: 0;
         cursor: pointer;
       }
 
-      &.confirm, &.done {
+      &[data-action='confirm'],
+      &[data-action='done'],
+      &[data-action='ok'],
+      &[data-action='yes'] {
         background-color: var(--cp-button-primary-color, #2d5931);
         color: var(--cp-button-primary-font-color, #ffffff);
       }
 
-      &.cancel {
+      &[data-action='cancel'],
+      &[data-action='no'] {
         background-color: var(--cp-button-secondary-color, #2d5931);
         color: var(--cp-button-secondary-font-color, #ffffff);
       }
@@ -498,29 +509,25 @@
     width: 100%;
   }
 
-  .editor {
+  prose-mirror {
     height: 100%;
     width: 100%;
 
     .editor-content {
-      border: var(--cp-input-border-width, 2px) var(--cp-input-border-style, solid) var(--cp-input-border-color, #2d5931);
-      padding: 2 * $spacing-sm
-    }
-
-    .tox-edit-area {
       background-color: #ffffff;
       border: var(--cp-input-border-width, 2px) var(--cp-input-border-style, solid) var(--cp-input-border-color, #2d5931);
+      padding: 2 * $spacing-sm
     }
   }
 
 
-  &.window-app .window-header {
+  &.application .window-header {
     position: relative;
     z-index: 3;
     background-color: rgba(0, 0, 0, 0.7);
   }
 
-  &.dialog .dialog-buttons {
+  &.dialog .form-footer {
     position: relative;
     z-index: 3;
   }

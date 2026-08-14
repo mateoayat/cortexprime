@@ -1,94 +1,143 @@
 /**
- * Extend the basic ActorSheet with some very simple modifications
- * @extends {foundry.appv1.sheets.ActorSheet}
+ * The Cortex Prime actor sheet.
+ * @extends {foundry.applications.sheets.ActorSheetV2}
  */
-import { getLength, objectMapValues, objectReindexFilter, objectFindValue, objectSome } from '../../lib/helpers.js'
+import { getLength, objectMapValues, objectReindexFilter, objectFindValue } from '../../lib/helpers.js'
 import { localizer } from '../scripts/foundryHelpers.js'
-import {
-  removeItems,
-  toggleItems
-} from '../scripts/sheetHelpers.js'
+import { bindAll, intData } from '../scripts/domHelpers.js'
+import { removeItems, resetDataPoint, toggleItems } from '../scripts/sheetHelpers.js'
+import { consumableDicePicker } from '../applications/consumableDicePicker.js'
 
-export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
+const { HandlebarsApplicationMixin } = foundry.applications.api
+const { ActorSheetV2 } = foundry.applications.sheets
 
-  get actor () {
-    return super.actor
-  }
-
-  /** @override */
-  static get defaultOptions() {
-    return foundry.utils.mergeObject(super.defaultOptions, {
-      classes: ['cortexprime', 'sheet', 'actor', 'actor-sheet'],
-      template: "systems/cortexprime/templates/actor/actor-sheet.html",
+export class CortexPrimeActorSheet extends HandlebarsApplicationMixin(ActorSheetV2) {
+  static DEFAULT_OPTIONS = {
+    classes: ['cortexprime', 'sheet', 'actor', 'actor-sheet'],
+    position: {
       width: 960,
-      height: 900,
-      tabs: [{ navSelector: ".sheet-tabs", contentSelector: ".sheet-body", initial: "traits" }]
-    })
-  }
-
-  getData (options) {
-    const data = super.getData(options)
-    const themes = game.settings.get('cortexprime', 'themes')
-    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
-
-    return {
-      ...data,
-      actorTypeOptions: objectMapValues(game.settings.get('cortexprime', 'actorTypes'), val => val.name),
-      theme,
+      height: 900
+    },
+    window: {
+      resizable: true
+    },
+    form: {
+      submitOnChange: true,
+      closeOnSubmit: false
+    },
+    actions: {
+      editImage: CortexPrimeActorSheet.prototype._onEditImage
     }
   }
 
-  /* -------------------------------------------- */
+  static PARTS = {
+    body: {
+      template: 'systems/cortexprime/templates/actor/actor-sheet.html'
+    }
+  }
+
+  tabGroups = {
+    primary: 'traits'
+  }
+
   /** @override */
-  activateListeners (html) {
-    super.activateListeners(html)
-    html.find('.update-actor-settings').click(this._updateActorSettings.bind(this))
-    html.find('.actor-type-confirm').click(this._actorTypeConfirm.bind(this))
-    html.find('.add-pp').click(() => { this.actor.changePpBy(1) })
-    html.find('.add-asset').click(this._addAsset.bind(this))
-    html.find('.add-complication').click(this._addComplication.bind(this))
-    html.find('.add-descriptor').click(this._addDescriptor.bind(this))
-    html.find('.add-note').click(this._addNote.bind(this))
-    html.find('.add-sfx').click(this._addSfx.bind(this))
-    html.find('.add-sub-trait').click(this._addSubTrait.bind(this))
-    html.find('.add-to-pool').click(this._addToPool.bind(this))
-    html.find('.add-trait').click(this._addTrait.bind(this))
-    html.find('.close-trait-set-edit').click(this._closeTraitSetEdit.bind(this))
-    html.find('.die-select').change(this._onDieChange.bind(this))
-    html.find('.die-select').on('mouseup', this._onDieRemove.bind(this))
-    html.find('.new-die').click(this._newDie.bind(this))
-    html.find('.pp-number-field').change(this._ppNumberChange.bind(this))
-    html.find('.spend-pp').click(() => {
-      this.actor
-        .changePpBy(-1)
-        .then(() => {
-          if (game.dice3d) {
-            game.dice3d.show({ throws: [{ dice: [{ result: 1, resultLabel: 1, type: 'dp', vectors: [], options: {} }] }] }, game.user, true)
-          }
+  async _prepareContext (options) {
+    const context = await super._prepareContext(options)
+    const themes = game.settings.get('cortexprime', 'themes')
+    const theme = themes.current === 'custom' ? themes.custom : themes.list[themes.current]
+    const data = this.actor.toObject(false)
+
+    return {
+      ...context,
+      actor: this.actor,
+      actorTypeOptions: objectMapValues(game.settings.get('cortexprime', 'actorTypes'), val => val.name),
+      activeTab: this.tabGroups.primary,
+      cssClass: this.isEditable ? 'editable' : 'locked',
+      data,
+      enrichedNotes: await this._enrichNotes(data.system?.actorType?.notes),
+      owner: this.actor.isOwner,
+      theme
+    }
+  }
+
+  async _enrichNotes (notes) {
+    const entries = await Promise.all(
+      Object.entries(notes ?? {}).map(async ([key, note]) => [
+        key,
+        await foundry.applications.ux.TextEditor.enrichHTML(note?.value ?? '', {
+          relativeTo: this.actor,
+          secrets: this.actor.isOwner
         })
-    })
-    html.find('.trait-set-edit').click(this._traitSetEdit.bind(this))
+      ])
+    )
+
+    return Object.fromEntries(entries)
+  }
+
+  /* -------------------------------------------- */
+
+  /** @override */
+  _onRender (context, options) {
+    super._onRender(context, options)
+
+    const html = this.element
+
+    bindAll(html, 'nav[data-group] [data-tab]', 'click', this._onTabClick.bind(this))
+    bindAll(html, '.update-actor-settings', 'click', this._updateActorSettings.bind(this))
+    bindAll(html, '.actor-type-confirm', 'click', this._actorTypeConfirm.bind(this))
+    bindAll(html, '.add-pp', 'click', () => { this.actor.changePpBy(1) })
+    bindAll(html, '.add-asset', 'click', this._addAsset.bind(this))
+    bindAll(html, '.add-complication', 'click', this._addComplication.bind(this))
+    bindAll(html, '.add-descriptor', 'click', this._addDescriptor.bind(this))
+    bindAll(html, '.add-note', 'click', this._addNote.bind(this))
+    bindAll(html, '.add-sfx', 'click', this._addSfx.bind(this))
+    bindAll(html, '.add-sub-trait', 'click', this._addSubTrait.bind(this))
+    bindAll(html, '.add-to-pool', 'click', this._addToPool.bind(this))
+    bindAll(html, '.add-trait', 'click', this._addTrait.bind(this))
+    bindAll(html, '.close-trait-set-edit', 'click', this._closeTraitSetEdit.bind(this))
+    bindAll(html, '.die-select', 'change', this._onDieChange.bind(this))
+    bindAll(html, '.die-select', 'mouseup', this._onDieRemove.bind(this))
+    bindAll(html, '.new-die', 'click', this._newDie.bind(this))
+    bindAll(html, '.pp-number-field', 'change', this._ppNumberChange.bind(this))
+    bindAll(html, '.spend-pp', 'click', this._spendPp.bind(this))
+    bindAll(html, '.trait-set-edit', 'click', this._traitSetEdit.bind(this))
+
     removeItems.call(this, html)
     toggleItems.call(this, html)
   }
 
-  /* -------------------------------------------- */
+  _onTabClick (event) {
+    event.preventDefault()
+    const { tab, group } = event.currentTarget.dataset
+    this.changeTab(tab, group ?? 'primary', { event, navElement: event.currentTarget })
+  }
 
-  /**
-   * Handle creating a new Owned Item for the actor using initial data defined in the HTML dataset
-   * @param {Event} event   The originating click event
-   * @private
-   */
+  async _onEditImage (event, target) {
+    const current = this.actor.img
+    const picker = new foundry.applications.apps.FilePicker.implementation({
+      type: 'image',
+      current,
+      callback: path => this.actor.update({ img: path }),
+      position: {
+        top: (this.position.top ?? 0) + 40,
+        left: (this.position.left ?? 0) + 10
+      }
+    })
+
+    return picker.browse()
+  }
+
+  /* -------------------------------------------- */
 
   async _actorTypeConfirm (event) {
     event.preventDefault()
     const actorTypes = game.settings.get('cortexprime', 'actorTypes')
-    const actorTypeIndex = $('.actor-type-select').val()
+    const actorTypeIndex = this.element.querySelector('.actor-type-select')?.value
 
     const actorType = actorTypes[actorTypeIndex]
 
     await this.actor.update({
-      'img': actorType.defaultImage,
+      img: actorType.defaultImage,
       'system.actorType': actorType,
       'system.pp.value': actorType.hasPlotPoints ? 1 : 0
     })
@@ -98,8 +147,6 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault()
     const { path } = event.currentTarget.dataset
     const currentAssets = foundry.utils.getProperty(this.actor, `${path}.assets`) ?? {}
-
-    console.log(path, currentAssets)
 
     await this._resetDataPoint(path, 'assets', {
       ...currentAssets,
@@ -114,7 +161,7 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     })
   }
 
-  async _addComplication(event) {
+  async _addComplication (event) {
     event.preventDefault()
     const { path } = event.currentTarget.dataset
     const currentComplications = foundry.utils.getProperty(this.actor, `${path}.complications`) ?? {}
@@ -132,7 +179,7 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     })
   }
 
-  async _addDescriptor(event) {
+  async _addDescriptor (event) {
     event.preventDefault()
     const { path } = event.currentTarget.dataset
     const currentDescriptors = foundry.utils.getProperty(this.actor, `${path}.descriptors`) ?? {}
@@ -146,7 +193,7 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     })
   }
 
-  async _addNote(event) {
+  async _addNote (event) {
     event.preventDefault()
     const currentNotes = this.actor.system.actorType.notes ?? {}
 
@@ -174,7 +221,7 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     })
   }
 
-  async _addSubTrait(event) {
+  async _addSubTrait (event) {
     event.preventDefault()
     const { path } = event.currentTarget.dataset
     const currentSubTraits = foundry.utils.getProperty(this.actor, `${path}.subTraits`) ?? {}
@@ -197,7 +244,7 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     let value = foundry.utils.getProperty(this.actor, `${path}.value`)
 
     if (consumable) {
-      const selectedDice = await this._getConsumableDiceSelection(value, label)
+      const selectedDice = await consumableDicePicker(value, label)
 
       if (selectedDice.remove?.length) {
         const newValue = objectReindexFilter(value, (_, key) => !selectedDice.remove.map(x => parseInt(x, 10)).includes(parseInt(key, 10)))
@@ -231,75 +278,15 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     })
   }
 
-  async _closeTraitSetEdit(event) {
+  async _closeTraitSetEdit (event) {
     await this.actor.update({
-      ['system.actorType.traitSetEdit']: null
-    })
-  }
-
-  async _getConsumableDiceSelection (options, label) {
-    const content = await foundry.applications.handlebars.renderTemplate('systems/cortexprime/templates/dialog/consumable-dice.html', {
-      options,
-      isOwner: game.user.isOwner
-    })
-
-    return new Promise((resolve, reject) => {
-      new Dialog({ 
-        title: label,
-        content,
-        buttons: {
-          cancel: {
-            icon: '<i class="fa-solid fa-times"></i>',
-            label: localizer('Cancel'),
-            callback () {
-              resolve({ remove: [], value: {} })
-            }
-          },
-          done: {
-            icon: '<i class="fa-solid fa-check"></i>',
-            label: localizer('AddToPool'),
-            callback (html) {
-              const remove = html.find('.remove-check').prop('checked')
-              const selectedDice = html.find('.die-select.selected').get()
-
-              if (!selectedDice?.length) {
-                resolve({ remove: [], value: {} })
-              }
-
-              resolve(
-                selectedDice
-                  .reduce((selectedValues, selectedDie, index) => {
-                    const $selectedDie = $(selectedDie)
-
-                    if (remove) {
-                      selectedValues.remove = [...selectedValues.remove, $selectedDie.data('key')]
-                    }
-
-                    selectedValues.value = { ...selectedValues.value, [getLength(selectedValues.value)]: $selectedDie.data('value') }
-
-                    return selectedValues
-                  }, { remove: [], value: {} })
-              )
-            }
-          }
-        },
-        default: 'cancel',
-        render(html) {
-          html.find('.die-select').click(function () {
-            const $dieContainer = $(this)
-            const $dieCpt = $dieContainer.find('.die-cpt')
-            $dieContainer.toggleClass('result selected')
-            $dieCpt.toggleClass('unchosen-cpt chosen-cpt')
-          })
-        }
-      }, { jQuery: true, classes: ['dialog', 'consumable-dice', 'cortexprime'] }).render(true)
+      'system.actorType.traitSetEdit': null
     })
   }
 
   async _newDie (event) {
     event.preventDefault()
-    const $targetNewDie = $(event.currentTarget)
-    const target = $targetNewDie.data('target')
+    const { target } = event.currentTarget.dataset
     const currentDiceData = foundry.utils.getProperty(this.actor, target)
     const currentDice = currentDiceData?.value ?? {}
     const newIndex = getLength(currentDice)
@@ -317,13 +304,11 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
 
   async _onDieChange (event) {
     event.preventDefault()
-    const $targetNewDie = $(event.currentTarget)
-    const target = $targetNewDie.data('target')
-    const targetKey = $targetNewDie.data('key')
-    const targetValue = $targetNewDie.val()
+    const element = event.currentTarget
+    const { target } = element.dataset
+    const targetKey = intData(element, 'key')
+    const targetValue = element.value
     const currentDiceData = foundry.utils.getProperty(this.actor, target)
-
-    console.log(target)
 
     const newValue = objectMapValues(currentDiceData.value ?? {}, (value, index) => parseInt(index, 10) === targetKey ? targetValue : value)
 
@@ -334,12 +319,12 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
     event.preventDefault()
 
     if (event.button === 2) {
-      const $target = $(event.currentTarget)
-      const target = $target.data('target')
-      const targetKey = $target.data('key')
+      const element = event.currentTarget
+      const { target } = element.dataset
+      const targetKey = intData(element, 'key')
       const currentDiceData = foundry.utils.getProperty(this.actor, target)
 
-      const newValue = objectReindexFilter(currentDiceData.value ?? {}, (_, key) => parseInt(key, 10) !== parseInt(targetKey))
+      const newValue = objectReindexFilter(currentDiceData.value ?? {}, (_, key) => parseInt(key, 10) !== targetKey)
 
       await this._resetDataPoint(target, 'value', newValue)
     }
@@ -347,34 +332,35 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
 
   async _ppNumberChange (event) {
     event.preventDefault()
-    const $field = $(event.currentTarget)
-    const parsedValue = parseInt($field.val(), 10)
-    const currentValue = parseInt(this.actor.pp.value, 10)
+    const parsedValue = parseInt(event.currentTarget.value, 10)
+    const currentValue = parseInt(this.actor.system.pp.value, 10)
     const newValue = parsedValue < 0 ? 0 : parsedValue
     const changeAmount = newValue - currentValue
 
-    this.actor.changePpBy(changeAmount, true)
+    await this.actor.changePpBy(changeAmount, true)
   }
 
-  async _resetDataPoint(path, target, value) {
-    await this.actor.update({
-      [`${path}.-=${target}`]: null
-    })
+  async _spendPp (event) {
+    await this.actor.changePpBy(-1)
 
-    await this.actor.update({
-      [`${path}.${target}`]: value
-    })
+    if (game.dice3d) {
+      game.dice3d.show({ throws: [{ dice: [{ result: 1, resultLabel: 1, type: 'dp', vectors: [], options: {} }] }] }, game.user, true)
+    }
   }
 
-  async _traitSetEdit(event) {
+  async _resetDataPoint (path, target, value) {
+    await resetDataPoint.call(this, path, target, value)
+  }
+
+  async _traitSetEdit (event) {
     const { traitSet } = event.currentTarget.dataset
 
     await this.actor.update({
-      ['system.actorType.traitSetEdit']: traitSet
+      'system.actorType.traitSetEdit': traitSet
     })
   }
 
-  async _updateActorSettings(event) {
+  async _updateActorSettings (event) {
     event.preventDefault()
 
     const actorData = this.actor.system.actorType
@@ -434,7 +420,6 @@ export class CortexPrimeActorSheet extends foundry.appv1.sheets.ActorSheet {
       })
     }
 
-    this._resetDataPoint('system', 'actorType', newData)
-    this.actor.update()
+    await this._resetDataPoint('system', 'actorType', newData)
   }
 }

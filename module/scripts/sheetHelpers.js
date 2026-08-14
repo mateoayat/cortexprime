@@ -1,32 +1,23 @@
-import { getLength, objectReindexFilter } from '../../lib/helpers.js'
+import { objectReindexFilter } from '../../lib/helpers.js'
 import { localizer } from './foundryHelpers.js'
+import { bindAll } from './domHelpers.js'
 
-export const addNewDataPoint = async function (data, path, value) {
-  const currentData = data || {}
+const { DialogV2 } = foundry.applications.api
 
-  await this.actor.update({
-    [`data.${path}`]: {
-      ...currentData,
-      [getLength(currentData)]: value
-    }
-  })
-}
-
+/**
+ * Overwrite `path.target` wholesale rather than merging into it. Foundry deep-merges update
+ * data by default, so removing a key from a keyed collection requires an explicit replacement.
+ */
 export const resetDataPoint = async function (path, target, value) {
   await this.actor.update({
-    [`${path}.-=${target}`]: null
-  })
-
-  await this.actor.update({
-    [`${path}.${target}`]: value
+    [`${path}.${target}`]: foundry.data.operators.ForcedReplacement.create(value)
   })
 }
 
-export const toggleItems = async function (html) {
-  html.find('.toggle-item').click(async event => {
+export const toggleItems = function (html) {
+  bindAll(html, '.toggle-item', 'click', async event => {
     event.preventDefault()
-    const $target = $(event.currentTarget)
-    const path = $target.data('path')
+    const { path } = event.currentTarget.dataset
     const value = !foundry.utils.getProperty(this.actor, path)
 
     await this.actor.update({
@@ -43,8 +34,8 @@ export const removeDataPoint = async function (data, path, target, key) {
   await resetDataPoint.call(this, path, target, newData)
 }
 
-export const removeItems = async function (html) {
-  html.find('.remove-item').click(async event => {
+export const removeItems = function (html) {
+  bindAll(html, '.remove-item', 'click', async event => {
     event.preventDefault()
     const {
       path,
@@ -53,14 +44,12 @@ export const removeItems = async function (html) {
       target
     } = event.currentTarget.dataset
 
-    let confirmed
-
-    await Dialog.confirm({
-      title: localizer('AreYouSure'),
-      content: `${localizer('Remove')} ${itemName}?`,
-      yes: () => { confirmed = true },
-      no: () => { confirmed = false },
-      defaultYes: false
+    const confirmed = await DialogV2.confirm({
+      window: { title: localizer('AreYouSure') },
+      content: `<p>${localizer('Remove')} ${foundry.utils.escapeHTML(itemName ?? '')}?</p>`,
+      modal: true,
+      yes: { default: false },
+      no: { default: true }
     })
 
     if (confirmed) {
