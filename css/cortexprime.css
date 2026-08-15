@@ -1268,9 +1268,19 @@
   border-radius: 0;
 }
 .cortexprime .btn.btn-pp {
+  -webkit-box-align: center;
+  -ms-flex-align: center;
+  align-items: center;
+  display: -webkit-inline-box;
+  display: -ms-inline-flexbox;
+  display: inline-flex;
+  -webkit-box-pack: center;
+  -ms-flex-pack: center;
+  justify-content: center;
   line-height: 0;
   padding: 0;
   border-radius: 50%;
+  width: auto;
 }
 .cortexprime .btn-secondary-cpt {
   background-color: var(--cp-button-secondary-color, #b30044);
